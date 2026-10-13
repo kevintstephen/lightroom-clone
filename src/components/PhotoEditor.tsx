@@ -9,7 +9,7 @@ interface PhotoEditorProps {
   onUpdateAdjustments: (adjustments: ImageAdjustments) => void;
   onApplyPreset: (preset: Preset) => void;
   onReset: () => void;
-  onDownload: () => void;
+  onDownload: (url: string) => void;
   presets: Preset[];
 }
 
@@ -264,7 +264,7 @@ export default function PhotoEditor({
             Reset
           </button>
           <button
-            onClick={onDownload}
+            onClick={() => onDownload(processedImage)}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
           >
             <Download className="w-4 h-4" />

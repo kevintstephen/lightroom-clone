@@ -100,10 +100,10 @@ function App() {
     }
   };
 
-  const handleDownloadPhoto = () => {
+  const handleDownloadPhoto = (url: string) => {
     if (!selectedPhoto) return;
     const link = document.createElement('a');
-    link.href = selectedPhoto.url;
+    link.href = url;
     link.download = `edited-${selectedPhoto.name}`;
     link.click();
   };
