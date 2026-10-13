@@ -113,42 +113,51 @@ export default function PhotoEditor({
       {/* Image Preview */}
       <div className="flex-1">
         <div className="bg-gray-800 rounded-lg p-4 relative">
-          <div className="relative w-full h-auto max-h-[70vh] overflow-hidden rounded">
-            <img
-              src={processedImageUrl}
-              alt={photo.name}
-              style={getFilterStyle()}
-              className="w-full h-auto max-h-[70vh] object-contain"
-            />
-            {/* Temperature overlay */}
-            {adjustments.temperature !== 0 && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundColor: adjustments.temperature > 0
-                    ? `rgba(255, 160, 0, ${adjustments.temperature / 200})`
-                    : `rgba(0, 100, 255, ${Math.abs(adjustments.temperature) / 200})`,
-                  mixBlendMode: 'overlay' as const,
+          <div className="relative w-full h-auto max-h-[70vh] overflow-hidden rounded flex items-center justify-center">
+            <div className="relative">
+              <img
+                src={processedImageUrl}
+                alt={photo.name}
+                style={getFilterStyle()}
+                className="max-w-full max-h-[70vh] object-contain"
+                ref={(img) => {
+                  if (img) {
+                    img.onload = () => {
+                      // Trigger re-render to get dimensions
+                    };
+                  }
                 }}
               />
-            )}
-            {/* Tint overlay */}
-            {adjustments.tint !== 0 && (
+              {/* Temperature overlay */}
+              {adjustments.temperature !== 0 && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundColor: adjustments.temperature > 0
+                      ? `rgba(255, 160, 0, ${adjustments.temperature / 200})`
+                      : `rgba(0, 100, 255, ${Math.abs(adjustments.temperature) / 200})`,
+                    mixBlendMode: 'overlay' as const,
+                  }}
+                />
+              )}
+              {/* Tint overlay */}
+              {adjustments.tint !== 0 && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundColor: adjustments.tint > 0
+                      ? `rgba(0, 255, 0, ${adjustments.tint / 200})`
+                      : `rgba(255, 0, 255, ${Math.abs(adjustments.tint) / 200})`,
+                    mixBlendMode: 'overlay' as const,
+                  }}
+                />
+              )}
+              {/* Vignette overlay */}
               <div
                 className="absolute inset-0 pointer-events-none"
-                style={{
-                  backgroundColor: adjustments.tint > 0
-                    ? `rgba(0, 255, 0, ${adjustments.tint / 200})`
-                    : `rgba(255, 0, 255, ${Math.abs(adjustments.tint) / 200})`,
-                  mixBlendMode: 'overlay' as const,
-                }}
+                style={getOverlayStyle()}
               />
-            )}
-            {/* Vignette overlay */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={getOverlayStyle()}
-            />
+            </div>
           </div>
         </div>
         {/* Hidden canvas for image processing */}
