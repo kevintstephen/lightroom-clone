@@ -26,35 +26,25 @@ export default function PhotoEditor({
   };
 
   const getFilterStyle = () => {
-    const { brightness, contrast, saturation, exposure, temperature, blur } = adjustments;
+    const { brightness, contrast, saturation, exposure, blur } = adjustments;
     return {
       filter: `
         brightness(${1 + (brightness + exposure) / 100})
         contrast(${1 + contrast / 100})
         saturate(${1 + saturation / 100})
-        sepia(${temperature > 0 ? temperature / 400 : 0})
-        hue-rotate(${temperature * 0.5}deg)
         blur(${blur}px)
       `,
     };
   };
 
   const getOverlayStyle = () => {
-    const { tint, highlights, shadows, vignette } = adjustments;
-    
-    // Tint: green or magenta overlay
-    let tintColor = '';
-    if (tint > 0) {
-      tintColor = `rgba(0, 255, 0, ${tint / 200})`; // green
-    } else if (tint < 0) {
-      tintColor = `rgba(255, 0, 255, ${Math.abs(tint) / 200})`; // magenta
-    }
+    const { highlights, shadows, vignette } = adjustments;
 
     // Highlights and shadows
     const highlightColor = highlights > 0
       ? `rgba(255, 255, 255, ${highlights / 200})`
       : `rgba(0, 0, 0, ${Math.abs(highlights) / 200})`;
-    
+
     const shadowColor = shadows > 0
       ? `rgba(0, 0, 0, ${shadows / 200})`
       : `rgba(255, 255, 255, ${Math.abs(shadows) / 200})`;
@@ -63,7 +53,7 @@ export default function PhotoEditor({
     const vignetteStrength = vignette / 100;
 
     return {
-      backgroundColor: tintColor || 'transparent',
+      backgroundColor: 'transparent',
       backgroundImage: `
         linear-gradient(to bottom, ${highlightColor}, transparent, ${shadowColor}),
         radial-gradient(circle, transparent ${50 - vignetteStrength * 50}%, rgba(0,0,0,${vignetteStrength}) 100%)
@@ -84,6 +74,31 @@ export default function PhotoEditor({
               style={getFilterStyle()}
               className="w-full h-auto max-h-[70vh] object-contain"
             />
+            {/* Temperature overlay */}
+            {adjustments.temperature !== 0 && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundColor: adjustments.temperature > 0
+                    ? `rgba(255, 160, 0, ${adjustments.temperature / 200})`
+                    : `rgba(0, 100, 255, ${Math.abs(adjustments.temperature) / 200})`,
+                  mixBlendMode: 'overlay' as const,
+                }}
+              />
+            )}
+            {/* Tint overlay */}
+            {adjustments.tint !== 0 && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  backgroundColor: adjustments.tint > 0
+                    ? `rgba(0, 255, 0, ${adjustments.tint / 200})`
+                    : `rgba(255, 0, 255, ${Math.abs(adjustments.tint) / 200})`,
+                  mixBlendMode: 'overlay' as const,
+                }}
+              />
+            )}
+            {/* Highlights/Shadows/Vignette overlay */}
             <div
               className="absolute inset-0 pointer-events-none"
               style={getOverlayStyle()}
