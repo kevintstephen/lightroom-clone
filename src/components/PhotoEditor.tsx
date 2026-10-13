@@ -1,6 +1,7 @@
 import type { Photo, ImageAdjustments, Preset } from '../types';
 import { Slider } from './Slider';
 import { Sparkles, Download, RotateCcw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 interface PhotoEditorProps {
   photo: Photo;
@@ -21,9 +22,64 @@ export default function PhotoEditor({
   onDownload,
   presets,
 }: PhotoEditorProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [processedImageUrl, setProcessedImageUrl] = useState<string>(photo.url);
+
   const handleSliderChange = (key: keyof ImageAdjustments, value: number) => {
     onUpdateAdjustments({ ...adjustments, [key]: value });
   };
+
+  // Process image with canvas for highlights and shadows
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      if (adjustments.highlights !== 0 || adjustments.shadows !== 0) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const brightness = (r + g + b) / 3;
+
+          // Highlights: affect bright areas (brightness > 128)
+          if (adjustments.highlights !== 0) {
+            const highlightFactor = Math.max(0, (brightness - 128) / 127);
+            const highlightAdjustment = adjustments.highlights * highlightFactor * 0.5;
+            data[i] = Math.min(255, Math.max(0, r + highlightAdjustment));
+            data[i + 1] = Math.min(255, Math.max(0, g + highlightAdjustment));
+            data[i + 2] = Math.min(255, Math.max(0, b + highlightAdjustment));
+          }
+
+          // Shadows: affect dark areas (brightness < 128)
+          if (adjustments.shadows !== 0) {
+            const shadowFactor = Math.max(0, (127 - brightness) / 127);
+            const shadowAdjustment = adjustments.shadows * shadowFactor * 0.5;
+            data[i] = Math.min(255, Math.max(0, r + shadowAdjustment));
+            data[i + 1] = Math.min(255, Math.max(0, g + shadowAdjustment));
+            data[i + 2] = Math.min(255, Math.max(0, b + shadowAdjustment));
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+      }
+
+      setProcessedImageUrl(canvas.toDataURL());
+    };
+    img.src = photo.url;
+  }, [photo.url, adjustments.highlights, adjustments.shadows]);
 
   const getFilterStyle = () => {
     const { brightness, contrast, saturation, exposure, blur } = adjustments;
@@ -38,16 +94,7 @@ export default function PhotoEditor({
   };
 
   const getOverlayStyle = () => {
-    const { highlights, shadows, vignette } = adjustments;
-
-    // Highlights and shadows
-    const highlightColor = highlights > 0
-      ? `rgba(255, 255, 255, ${highlights / 200})`
-      : `rgba(0, 0, 0, ${Math.abs(highlights) / 200})`;
-
-    const shadowColor = shadows > 0
-      ? `rgba(0, 0, 0, ${shadows / 200})`
-      : `rgba(255, 255, 255, ${Math.abs(shadows) / 200})`;
+    const { vignette } = adjustments;
 
     // Vignette - dark edges
     const vignetteStrength = vignette / 100;
@@ -55,7 +102,6 @@ export default function PhotoEditor({
     return {
       backgroundColor: 'transparent',
       backgroundImage: `
-        linear-gradient(to bottom, ${highlightColor}, transparent, ${shadowColor}),
         radial-gradient(circle, transparent ${50 - vignetteStrength * 50}%, rgba(0,0,0,${vignetteStrength}) 100%)
       `,
       mixBlendMode: 'overlay' as const,
@@ -69,7 +115,7 @@ export default function PhotoEditor({
         <div className="bg-gray-800 rounded-lg p-4 relative">
           <div className="relative w-full h-auto max-h-[70vh] overflow-hidden rounded">
             <img
-              src={photo.url}
+              src={processedImageUrl}
               alt={photo.name}
               style={getFilterStyle()}
               className="w-full h-auto max-h-[70vh] object-contain"
@@ -98,13 +144,15 @@ export default function PhotoEditor({
                 }}
               />
             )}
-            {/* Highlights/Shadows/Vignette overlay */}
+            {/* Vignette overlay */}
             <div
               className="absolute inset-0 pointer-events-none"
               style={getOverlayStyle()}
             />
           </div>
         </div>
+        {/* Hidden canvas for image processing */}
+        <canvas ref={canvasRef} className="hidden" />
       </div>
 
       {/* Controls Panel */}
