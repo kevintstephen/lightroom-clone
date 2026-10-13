@@ -1,7 +1,14 @@
-import type { Photo, ImageAdjustments, Preset } from '../types';
+import type { Photo, ImageAdjustments, Preset, CurvePoint } from '../types';
 import { Slider } from './Slider';
-import { Sparkles, Download, RotateCcw } from 'lucide-react';
+import { Sparkles, Download, RotateCcw, Upload, Wand, X } from 'lucide-react';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { buildCurveLUT } from '../lib/curve';
+import {
+  getFilterStyle,
+  getTemperatureStyle,
+  getTintStyle,
+  getVignetteStyle,
+} from '../lib/utils';
 
 interface PhotoEditorProps {
   photo: Photo;
@@ -10,6 +17,9 @@ interface PhotoEditorProps {
   onApplyPreset: (preset: Preset) => void;
   onReset: () => void;
   onDownload: (url: string) => void;
+  onImportPresets: (files: FileList) => void;
+  onExtractLook: (file: File) => void;
+  onDeletePreset: (presetId: string) => void;
   presets: Preset[];
 }
 
@@ -20,14 +30,35 @@ export default function PhotoEditor({
   onApplyPreset,
   onReset,
   onDownload,
+  onImportPresets,
+  onExtractLook,
+  onDeletePreset,
   presets,
 }: PhotoEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const presetInputRef = useRef<HTMLInputElement>(null);
+  const lookInputRef = useRef<HTMLInputElement>(null);
   const [processedImageUrl, setProcessedImageUrl] = useState<string>(photo.url);
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSliderChange = (key: keyof ImageAdjustments, value: number) => {
     onUpdateAdjustments({ ...adjustments, [key]: value });
+  };
+
+  const handleClearCurve = () => {
+    const rest = { ...adjustments };
+    delete rest.toneCurve;
+    onUpdateAdjustments(rest);
+  };
+
+  const curvePolyline = (pts?: CurvePoint[]): string => {
+    if (!pts) return '';
+    const lut = buildCurveLUT(pts);
+    let s = `0,${100 - (lut[0] / 255) * 100}`;
+    for (let i = 4; i < 256; i += 4) {
+      s += ` ${(i / 255) * 100},${100 - (lut[i] / 255) * 100}`;
+    }
+    return s;
   };
 
   // Process image with canvas for highlights and shadows (debounced)
@@ -38,6 +69,16 @@ export default function PhotoEditor({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const curves = adjustments.toneCurve;
+    const luts = curves
+      ? {
+          rgb: curves.rgb ? buildCurveLUT(curves.rgb) : undefined,
+          red: curves.red ? buildCurveLUT(curves.red) : undefined,
+          green: curves.green ? buildCurveLUT(curves.green) : undefined,
+          blue: curves.blue ? buildCurveLUT(curves.blue) : undefined,
+        }
+      : null;
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
@@ -45,7 +86,7 @@ export default function PhotoEditor({
       canvas.height = img.height;
       ctx.drawImage(img, 0, 0);
 
-      if (adjustments.highlights !== 0 || adjustments.shadows !== 0) {
+      if (adjustments.highlights !== 0 || adjustments.shadows !== 0 || luts) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
 
@@ -78,6 +119,20 @@ export default function PhotoEditor({
             newB = Math.min(255, Math.max(0, newB + adjustment));
           }
 
+          if (luts) {
+            newR = Math.round(newR);
+            newG = Math.round(newG);
+            newB = Math.round(newB);
+            if (luts.rgb) {
+              newR = luts.rgb[newR];
+              newG = luts.rgb[newG];
+              newB = luts.rgb[newB];
+            }
+            if (luts.red) newR = luts.red[newR];
+            if (luts.green) newG = luts.green[newG];
+            if (luts.blue) newB = luts.blue[newB];
+          }
+
           data[i] = newR;
           data[i + 1] = newG;
           data[i + 2] = newB;
@@ -89,7 +144,7 @@ export default function PhotoEditor({
       setProcessedImageUrl(canvas.toDataURL());
     };
     img.src = photo.url;
-  }, [photo.url, adjustments.highlights, adjustments.shadows]);
+  }, [photo.url, adjustments.highlights, adjustments.shadows, adjustments.toneCurve]);
 
   useEffect(() => {
     // Clear previous timer
@@ -108,85 +163,48 @@ export default function PhotoEditor({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [photo.url, adjustments.highlights, adjustments.shadows]);
+  }, [photo.url, adjustments.highlights, adjustments.shadows, adjustments.toneCurve]);
 
-  const getFilterStyle = () => {
-    const { brightness, contrast, saturation, exposure, blur } = adjustments;
-    return {
-      filter: `
-        brightness(${1 + (brightness + exposure) / 100})
-        contrast(${1 + contrast / 100})
-        saturate(${1 + saturation / 100})
-        blur(${blur}px)
-      `,
-    };
-  };
-
-  const getOverlayStyle = () => {
-    const { vignette } = adjustments;
-
-    // Vignette - dark edges
-    const vignetteStrength = vignette / 100;
-
-    return {
-      backgroundColor: 'transparent',
-      backgroundImage: `
-        radial-gradient(circle, transparent ${50 - vignetteStrength * 50}%, rgba(0,0,0,${vignetteStrength}) 100%)
-      `,
-      mixBlendMode: 'overlay' as const,
-    };
-  };
+  const filterStyle = getFilterStyle(adjustments);
 
   return (
-    <div className="flex gap-6">
+    <div className="flex gap-5 h-full min-h-0">
       {/* Image Preview */}
-      <div className="flex-1">
-        <div className="bg-gray-800 rounded-lg p-4 relative">
-          <div className="relative w-full h-auto max-h-[70vh] overflow-hidden rounded flex items-center justify-center">
-            <div className="relative">
-              <img
-                src={processedImageUrl}
-                alt={photo.name}
-                style={getFilterStyle()}
-                className="max-w-full max-h-[70vh] object-contain"
-                ref={(img) => {
-                  if (img) {
-                    img.onload = () => {
-                      // Trigger re-render to get dimensions
-                    };
-                  }
-                }}
-              />
-              {/* Temperature overlay */}
-              {adjustments.temperature !== 0 && (
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    backgroundColor: adjustments.temperature > 0
-                      ? `rgba(255, 160, 0, ${adjustments.temperature / 200})`
-                      : `rgba(0, 100, 255, ${Math.abs(adjustments.temperature) / 200})`,
-                    mixBlendMode: 'overlay' as const,
-                  }}
-                />
-              )}
-              {/* Tint overlay */}
-              {adjustments.tint !== 0 && (
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    backgroundColor: adjustments.tint > 0
-                      ? `rgba(0, 255, 0, ${adjustments.tint / 200})`
-                      : `rgba(255, 0, 255, ${Math.abs(adjustments.tint) / 200})`,
-                    mixBlendMode: 'overlay' as const,
-                  }}
-                />
-              )}
-              {/* Vignette overlay */}
+      <div className="flex-1 min-w-0 min-h-0 bg-neutral-900 border border-neutral-800 rounded-lg p-4">
+        <div className="relative w-full h-full overflow-hidden rounded flex items-center justify-center">
+          <div className="relative">
+            <img
+              src={processedImageUrl}
+              alt={photo.name}
+              style={filterStyle}
+              className="max-w-full max-h-[calc(100vh-190px)] object-contain"
+              ref={(img) => {
+                if (img) {
+                  img.onload = () => {
+                    // Trigger re-render to get dimensions
+                  };
+                }
+              }}
+            />
+            {/* Temperature overlay */}
+            {adjustments.temperature !== 0 && (
               <div
                 className="absolute inset-0 pointer-events-none"
-                style={getOverlayStyle()}
+                style={getTemperatureStyle(adjustments)}
               />
-            </div>
+            )}
+            {/* Tint overlay */}
+            {adjustments.tint !== 0 && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={getTintStyle(adjustments)}
+              />
+            )}
+            {/* Vignette overlay */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={getVignetteStyle(adjustments)}
+            />
           </div>
         </div>
         {/* Hidden canvas for image processing */}
@@ -194,25 +212,130 @@ export default function PhotoEditor({
       </div>
 
       {/* Controls Panel */}
-      <div className="w-80 bg-gray-800 rounded-lg p-6 space-y-6">
+      <div className="w-[340px] shrink-0 min-h-0 overflow-y-auto bg-neutral-900 border border-neutral-800 rounded-lg p-5 space-y-6">
         {/* Presets */}
         <div>
-          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-            <Sparkles className="w-5 h-5" />
-            Presets
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Sparkles className="w-5 h-5" />
+              Presets
+            </h3>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => lookInputRef.current?.click()}
+                title="Extract a look from a reference photo"
+                className="flex items-center gap-1 px-2 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-xs transition-colors"
+              >
+                <Wand className="w-3 h-3" />
+                From photo
+              </button>
+              <button
+                onClick={() => presetInputRef.current?.click()}
+                title="Import .xmp preset"
+                className="flex items-center gap-1 px-2 py-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-xs transition-colors"
+              >
+                <Upload className="w-3 h-3" />
+                Import
+              </button>
+              <input
+                ref={lookInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) onExtractLook(e.target.files[0]);
+                  e.target.value = '';
+                }}
+              />
+              <input
+                ref={presetInputRef}
+                type="file"
+                accept=".xmp"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files) onImportPresets(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-2">
             {presets.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => onApplyPreset(preset)}
-                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm transition-colors"
-              >
-                {preset.name}
-              </button>
+              <div key={preset.id} className="relative group">
+                <button
+                  onClick={() => onApplyPreset(preset)}
+                  className="w-full px-3 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-md text-sm transition-colors"
+                >
+                  {preset.name}
+                </button>
+                {preset.custom && (
+                  <button
+                    onClick={() => onDeletePreset(preset.id)}
+                    className="absolute -top-1 -right-1 p-1 bg-neutral-950 hover:bg-red-600 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>
+
+        {/* Tone Curve */}
+        {adjustments.toneCurve && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">Tone Curve</h3>
+              <button
+                onClick={handleClearCurve}
+                className="text-xs text-neutral-500 hover:text-neutral-200 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+            <svg
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              className="w-full h-28 bg-neutral-950 rounded-md"
+            >
+              <line x1="50" y1="0" x2="50" y2="100" stroke="#404040" strokeWidth="0.5" />
+              <line x1="0" y1="50" x2="100" y2="50" stroke="#404040" strokeWidth="0.5" />
+              {adjustments.toneCurve.rgb && (
+                <polyline
+                  points={curvePolyline(adjustments.toneCurve.rgb)}
+                  fill="none"
+                  stroke="#e5e7eb"
+                  strokeWidth="1.5"
+                />
+              )}
+              {adjustments.toneCurve.red && (
+                <polyline
+                  points={curvePolyline(adjustments.toneCurve.red)}
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="1"
+                />
+              )}
+              {adjustments.toneCurve.green && (
+                <polyline
+                  points={curvePolyline(adjustments.toneCurve.green)}
+                  fill="none"
+                  stroke="#22c55e"
+                  strokeWidth="1"
+                />
+              )}
+              {adjustments.toneCurve.blue && (
+                <polyline
+                  points={curvePolyline(adjustments.toneCurve.blue)}
+                  fill="none"
+                  stroke="#3b82f6"
+                  strokeWidth="1"
+                />
+              )}
+            </svg>
+          </div>
+        )}
 
         {/* Adjustments */}
         <div>
@@ -293,17 +416,17 @@ export default function PhotoEditor({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 pt-4 border-t border-gray-700">
+        <div className="flex gap-2 pt-4 border-t border-neutral-800">
           <button
             onClick={onReset}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-md text-sm transition-colors"
           >
             <RotateCcw className="w-4 h-4" />
             Reset
           </button>
           <button
-            onClick={() => onDownload(processedImage)}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+            onClick={() => onDownload(processedImageUrl)}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover rounded-md text-sm transition-colors"
           >
             <Download className="w-4 h-4" />
             Export

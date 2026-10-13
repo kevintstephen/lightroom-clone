@@ -1,4 +1,4 @@
-# Lightroom Clone
+# Aperture
 
 A web-based photo editing application inspired by Adobe Lightroom, built with React, TypeScript, and Tailwind CSS.
 

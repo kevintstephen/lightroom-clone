@@ -11,8 +11,8 @@ export function Slider({ label, value, onChange, min, max, step = 1 }: SliderPro
   return (
     <div>
       <div className="flex justify-between items-center mb-2">
-        <label className="text-sm font-medium">{label}</label>
-        <span className="text-sm text-gray-400 w-12 text-right">{value.toFixed(step < 1 ? 1 : 0)}</span>
+        <label className="text-sm text-neutral-300">{label}</label>
+        <span className="text-sm text-neutral-500 w-12 text-right">{value.toFixed(step < 1 ? 1 : 0)}</span>
       </div>
       <input
         type="range"
@@ -21,7 +21,7 @@ export function Slider({ label, value, onChange, min, max, step = 1 }: SliderPro
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+        className="w-full h-1.5 bg-neutral-700 rounded-full appearance-none cursor-pointer accent-accent"
       />
     </div>
   );

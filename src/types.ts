@@ -3,8 +3,21 @@ export interface Photo {
   name: string;
   url: string;
   originalUrl: string;
+  blob: Blob;
   dateAdded: Date;
   adjustments: ImageAdjustments;
+}
+
+export interface CurvePoint {
+  x: number; // 0-255 input
+  y: number; // 0-255 output
+}
+
+export interface ToneCurves {
+  rgb?: CurvePoint[];
+  red?: CurvePoint[];
+  green?: CurvePoint[];
+  blue?: CurvePoint[];
 }
 
 export interface ImageAdjustments {
@@ -19,6 +32,7 @@ export interface ImageAdjustments {
   vignette: number;
   blur: number;
   sharpen: number;
+  toneCurve?: ToneCurves;
 }
 
 export const defaultAdjustments: ImageAdjustments = {
@@ -39,4 +53,5 @@ export interface Preset {
   id: string;
   name: string;
   adjustments: ImageAdjustments;
+  custom?: boolean;
 }
