@@ -99,7 +99,7 @@ export default function PhotoEditor({
         clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [processImage]);
+  }, [photo.url, adjustments.highlights, adjustments.shadows]);
 
   const getFilterStyle = () => {
     const { brightness, contrast, saturation, exposure, blur } = adjustments;
