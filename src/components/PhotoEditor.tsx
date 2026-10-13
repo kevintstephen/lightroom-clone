@@ -70,12 +70,18 @@ export default function PhotoEditor({
     // Vignette - dark edges
     const vignetteStrength = vignette / 150;
 
+    // Combine temperature and tint - add them to background gradients
+    const colorGradients = [];
+    if (tempOverlay) colorGradients.push(tempOverlay);
+    if (tintColor) colorGradients.push(tintColor);
+
     return {
-      backgroundColor: tempOverlay || tintColor || 'transparent',
-      backgroundImage: `
-        linear-gradient(to bottom, ${highlightColor}, transparent, ${shadowColor}),
-        radial-gradient(circle, transparent ${50 - vignetteStrength * 50}%, rgba(0,0,0,${vignetteStrength}) 100%)
-      `,
+      backgroundColor: 'transparent',
+      backgroundImage: [
+        ...colorGradients,
+        `linear-gradient(to bottom, ${highlightColor}, transparent, ${shadowColor})`,
+        `radial-gradient(circle, transparent ${50 - vignetteStrength * 50}%, rgba(0,0,0,${vignetteStrength}) 100%)`
+      ].join(', '),
       mixBlendMode: 'overlay' as const,
     };
   };
