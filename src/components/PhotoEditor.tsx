@@ -1,7 +1,7 @@
 import type { Photo, ImageAdjustments, Preset } from '../types';
 import { Slider } from './Slider';
 import { Sparkles, Download, RotateCcw } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 
 interface PhotoEditorProps {
   photo: Photo;
@@ -24,13 +24,14 @@ export default function PhotoEditor({
 }: PhotoEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [processedImageUrl, setProcessedImageUrl] = useState<string>(photo.url);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSliderChange = (key: keyof ImageAdjustments, value: number) => {
     onUpdateAdjustments({ ...adjustments, [key]: value });
   };
 
-  // Process image with canvas for highlights and shadows
-  useEffect(() => {
+  // Process image with canvas for highlights and shadows (debounced)
+  const processImage = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -80,6 +81,25 @@ export default function PhotoEditor({
     };
     img.src = photo.url;
   }, [photo.url, adjustments.highlights, adjustments.shadows]);
+
+  useEffect(() => {
+    // Clear previous timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new timer
+    debounceTimerRef.current = setTimeout(() => {
+      processImage();
+    }, 150); // 150ms debounce delay
+
+    // Cleanup
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [processImage]);
 
   const getFilterStyle = () => {
     const { brightness, contrast, saturation, exposure, blur } = adjustments;
