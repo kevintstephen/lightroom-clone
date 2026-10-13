@@ -92,16 +92,6 @@ function App() {
     handleUpdateAdjustments({ ...defaultAdjustments });
   };
 
-  const handleRevertToOriginal = () => {
-    if (!selectedPhoto) return;
-    setPhotos((prev) =>
-      prev.map((p) =>
-        p.id === selectedPhoto.id ? { ...p, url: p.originalUrl, adjustments: { ...defaultAdjustments } } : p
-      )
-    );
-    setSelectedPhoto({ ...selectedPhoto, url: selectedPhoto.originalUrl, adjustments: { ...defaultAdjustments } });
-  };
-
   const handleDeletePhoto = (photoId: string) => {
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
     if (selectedPhoto?.id === photoId) {
@@ -188,7 +178,6 @@ function App() {
               onUpdateAdjustments={handleUpdateAdjustments}
               onApplyPreset={handleApplyPreset}
               onReset={handleResetAdjustments}
-              onRevertToOriginal={handleRevertToOriginal}
               onDownload={handleDownloadPhoto}
               presets={presets}
             />
