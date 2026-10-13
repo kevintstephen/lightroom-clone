@@ -26,62 +26,48 @@ export default function PhotoEditor({
   };
 
   const getFilterStyle = () => {
-    const { brightness, contrast, saturation, exposure, blur } = adjustments;
+    const { brightness, contrast, saturation, exposure, temperature, blur } = adjustments;
     return {
       filter: `
         brightness(${1 + (brightness + exposure) / 100})
         contrast(${1 + contrast / 100})
         saturate(${1 + saturation / 100})
+        sepia(${temperature > 0 ? temperature / 400 : 0})
+        hue-rotate(${temperature * 0.5}deg)
         blur(${blur}px)
       `,
     };
   };
 
   const getOverlayStyle = () => {
-    const { temperature, tint, highlights, shadows, vignette } = adjustments;
-    
-    // Temperature: warm (orange/yellow) or cool (blue) overlay
-    let tempOverlay = '';
-    if (temperature > 0) {
-      // Warm: orange/yellow tint
-      tempOverlay = `rgba(255, 180, 50, ${temperature / 300})`;
-    } else if (temperature < 0) {
-      // Cool: blue tint
-      tempOverlay = `rgba(50, 100, 255, ${Math.abs(temperature) / 300})`;
-    }
+    const { tint, highlights, shadows, vignette } = adjustments;
     
     // Tint: green or magenta overlay
     let tintColor = '';
     if (tint > 0) {
-      tintColor = `rgba(0, 255, 0, ${tint / 300})`; // green
+      tintColor = `rgba(0, 255, 0, ${tint / 200})`; // green
     } else if (tint < 0) {
-      tintColor = `rgba(255, 0, 255, ${Math.abs(tint) / 300})`; // magenta
+      tintColor = `rgba(255, 0, 255, ${Math.abs(tint) / 200})`; // magenta
     }
 
     // Highlights and shadows
     const highlightColor = highlights > 0
-      ? `rgba(255, 255, 255, ${highlights / 300})`
-      : `rgba(0, 0, 0, ${Math.abs(highlights) / 300})`;
+      ? `rgba(255, 255, 255, ${highlights / 200})`
+      : `rgba(0, 0, 0, ${Math.abs(highlights) / 200})`;
     
     const shadowColor = shadows > 0
-      ? `rgba(0, 0, 0, ${shadows / 300})`
-      : `rgba(255, 255, 255, ${Math.abs(shadows) / 300})`;
+      ? `rgba(0, 0, 0, ${shadows / 200})`
+      : `rgba(255, 255, 255, ${Math.abs(shadows) / 200})`;
 
     // Vignette - dark edges
-    const vignetteStrength = vignette / 150;
-
-    // Combine temperature and tint - add them to background gradients
-    const colorGradients = [];
-    if (tempOverlay) colorGradients.push(tempOverlay);
-    if (tintColor) colorGradients.push(tintColor);
+    const vignetteStrength = vignette / 100;
 
     return {
-      backgroundColor: 'transparent',
-      backgroundImage: [
-        ...colorGradients,
-        `linear-gradient(to bottom, ${highlightColor}, transparent, ${shadowColor})`,
-        `radial-gradient(circle, transparent ${50 - vignetteStrength * 50}%, rgba(0,0,0,${vignetteStrength}) 100%)`
-      ].join(', '),
+      backgroundColor: tintColor || 'transparent',
+      backgroundImage: `
+        linear-gradient(to bottom, ${highlightColor}, transparent, ${shadowColor}),
+        radial-gradient(circle, transparent ${50 - vignetteStrength * 50}%, rgba(0,0,0,${vignetteStrength}) 100%)
+      `,
       mixBlendMode: 'overlay' as const,
     };
   };
