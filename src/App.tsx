@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
-import { Photo, ImageAdjustments, defaultAdjustments, Preset } from './types';
-import { Upload, Image as ImageIcon, Sliders, Sparkles, Download, Trash2, RotateCcw } from 'lucide-react';
+import type { Photo, ImageAdjustments, Preset } from './types';
+import { defaultAdjustments } from './types';
+import { Upload, Image as ImageIcon, Sliders } from 'lucide-react';
 import PhotoLibrary from './components/PhotoLibrary';
 import PhotoEditor from './components/PhotoEditor';
 import { cn } from './lib/utils';
@@ -91,6 +92,16 @@ function App() {
     handleUpdateAdjustments({ ...defaultAdjustments });
   };
 
+  const handleRevertToOriginal = () => {
+    if (!selectedPhoto) return;
+    setPhotos((prev) =>
+      prev.map((p) =>
+        p.id === selectedPhoto.id ? { ...p, url: p.originalUrl, adjustments: { ...defaultAdjustments } } : p
+      )
+    );
+    setSelectedPhoto({ ...selectedPhoto, url: selectedPhoto.originalUrl, adjustments: { ...defaultAdjustments } });
+  };
+
   const handleDeletePhoto = (photoId: string) => {
     setPhotos((prev) => prev.filter((p) => p.id !== photoId));
     if (selectedPhoto?.id === photoId) {
@@ -177,6 +188,7 @@ function App() {
               onUpdateAdjustments={handleUpdateAdjustments}
               onApplyPreset={handleApplyPreset}
               onReset={handleResetAdjustments}
+              onRevertToOriginal={handleRevertToOriginal}
               onDownload={handleDownloadPhoto}
               presets={presets}
             />

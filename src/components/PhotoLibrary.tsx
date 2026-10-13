@@ -1,4 +1,4 @@
-import { Photo } from '../types';
+import type { Photo } from '../types';
 import { Trash2, Calendar } from 'lucide-react';
 
 interface PhotoLibraryProps {

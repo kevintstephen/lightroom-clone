@@ -1,6 +1,6 @@
-import { Photo, ImageAdjustments, Preset } from '../types';
+import type { Photo, ImageAdjustments, Preset } from '../types';
 import { Slider } from './Slider';
-import { Sparkles, Download, RotateCcw, ArrowLeft } from 'lucide-react';
+import { Sparkles, Download, RotateCcw, Undo2 } from 'lucide-react';
 
 interface PhotoEditorProps {
   photo: Photo;
@@ -8,6 +8,7 @@ interface PhotoEditorProps {
   onUpdateAdjustments: (adjustments: ImageAdjustments) => void;
   onApplyPreset: (preset: Preset) => void;
   onReset: () => void;
+  onRevertToOriginal: () => void;
   onDownload: () => void;
   presets: Preset[];
 }
@@ -18,6 +19,7 @@ export default function PhotoEditor({
   onUpdateAdjustments,
   onApplyPreset,
   onReset,
+  onRevertToOriginal,
   onDownload,
   presets,
 }: PhotoEditorProps) {
@@ -29,13 +31,42 @@ export default function PhotoEditor({
     const { brightness, contrast, saturation, exposure, temperature, tint, blur } = adjustments;
     return {
       filter: `
-        brightness(${1 + brightness / 100})
+        brightness(${1 + (brightness + exposure) / 100})
         contrast(${1 + contrast / 100})
         saturate(${1 + saturation / 100})
-        brightness(${1 + exposure / 100})
-        sepia(${Math.abs(temperature) / 200})
-        hue-rotate(${temperature}deg)
         blur(${blur}px)
+      `,
+    };
+  };
+
+  const getOverlayStyle = () => {
+    const { temperature, tint, highlights, shadows, vignette } = adjustments;
+    
+    // Temperature: warm (orange) or cool (blue) overlay
+    const tempColor = temperature > 0
+      ? `rgba(255, 140, 0, ${Math.abs(temperature) / 200})` // warm
+      : `rgba(0, 100, 255, ${Math.abs(temperature) / 200})`; // cool
+    
+    // Tint: green or magenta overlay
+    const tintColor = tint > 0
+      ? `rgba(0, 255, 0, ${Math.abs(tint) / 200})` // green
+      : `rgba(255, 0, 255, ${Math.abs(tint) / 200})`; // magenta
+
+    // Highlights and shadows using SVG-like approach
+    const highlightColor = highlights > 0
+      ? `rgba(255, 255, 255, ${highlights / 200})`
+      : `rgba(0, 0, 0, ${Math.abs(highlights) / 200})`;
+    
+    const shadowColor = shadows > 0
+      ? `rgba(0, 0, 0, ${shadows / 200})`
+      : `rgba(255, 255, 255, ${Math.abs(shadows) / 200})`;
+
+    return {
+      background: `
+        radial-gradient(circle, transparent ${50 - vignette / 4}%, rgba(0,0,0,${vignette / 100}) 100%),
+        linear-gradient(to bottom, ${highlightColor}, transparent, ${shadowColor}),
+        ${tempColor},
+        ${tintColor}
       `,
     };
   };
@@ -44,13 +75,18 @@ export default function PhotoEditor({
     <div className="flex gap-6">
       {/* Image Preview */}
       <div className="flex-1">
-        <div className="bg-gray-800 rounded-lg p-4">
-          <img
-            src={photo.url}
-            alt={photo.name}
-            style={getFilterStyle()}
-            className="w-full h-auto max-h-[70vh] object-contain rounded"
-          />
+        <div className="bg-gray-800 rounded-lg p-4 relative">
+          <div
+            className="w-full h-auto max-h-[70vh] object-contain rounded relative overflow-hidden"
+            style={getOverlayStyle()}
+          >
+            <img
+              src={photo.url}
+              alt={photo.name}
+              style={getFilterStyle()}
+              className="w-full h-auto max-h-[70vh] object-contain"
+            />
+          </div>
         </div>
       </div>
 
@@ -161,6 +197,14 @@ export default function PhotoEditor({
           >
             <RotateCcw className="w-4 h-4" />
             Reset
+          </button>
+          <button
+            onClick={onRevertToOriginal}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            title="Revert to original photo"
+          >
+            <Undo2 className="w-4 h-4" />
+            Original
           </button>
           <button
             onClick={onDownload}
