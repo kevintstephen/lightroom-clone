@@ -53,25 +53,34 @@ export default function PhotoEditor({
           const r = data[i];
           const g = data[i + 1];
           const b = data[i + 2];
-          const brightness = (r + g + b) / 3;
+          
+          // Calculate luminosity (perceived brightness)
+          const luminosity = 0.299 * r + 0.587 * g + 0.114 * b;
+          const normalizedLum = luminosity / 255;
 
-          // Highlights: affect bright areas (brightness > 128)
-          if (adjustments.highlights !== 0) {
-            const highlightFactor = Math.max(0, (brightness - 128) / 127);
-            const highlightAdjustment = adjustments.highlights * highlightFactor * 0.5;
-            data[i] = Math.min(255, Math.max(0, r + highlightAdjustment));
-            data[i + 1] = Math.min(255, Math.max(0, g + highlightAdjustment));
-            data[i + 2] = Math.min(255, Math.max(0, b + highlightAdjustment));
+          let newR = r, newG = g, newB = b;
+
+          // Highlights: affect tones with high luminosity (upper 60%)
+          if (adjustments.highlights !== 0 && normalizedLum > 0.4) {
+            const highlightMask = Math.pow((normalizedLum - 0.4) / 0.6, 2); // Smooth curve
+            const adjustment = adjustments.highlights * highlightMask * 2;
+            newR = Math.min(255, Math.max(0, r + adjustment));
+            newG = Math.min(255, Math.max(0, g + adjustment));
+            newB = Math.min(255, Math.max(0, b + adjustment));
           }
 
-          // Shadows: affect dark areas (brightness < 128)
-          if (adjustments.shadows !== 0) {
-            const shadowFactor = Math.max(0, (127 - brightness) / 127);
-            const shadowAdjustment = adjustments.shadows * shadowFactor * 0.5;
-            data[i] = Math.min(255, Math.max(0, r + shadowAdjustment));
-            data[i + 1] = Math.min(255, Math.max(0, g + shadowAdjustment));
-            data[i + 2] = Math.min(255, Math.max(0, b + shadowAdjustment));
+          // Shadows: affect tones with low luminosity (lower 40%)
+          if (adjustments.shadows !== 0 && normalizedLum < 0.6) {
+            const shadowMask = Math.pow((0.6 - normalizedLum) / 0.6, 2); // Smooth curve
+            const adjustment = adjustments.shadows * shadowMask * 2;
+            newR = Math.min(255, Math.max(0, newR + adjustment));
+            newG = Math.min(255, Math.max(0, newG + adjustment));
+            newB = Math.min(255, Math.max(0, newB + adjustment));
           }
+
+          data[i] = newR;
+          data[i + 1] = newG;
+          data[i + 2] = newB;
         }
 
         ctx.putImageData(imageData, 0, 0);
